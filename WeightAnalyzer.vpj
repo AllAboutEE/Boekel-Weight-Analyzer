@@ -130,15 +130,22 @@
 		<Folder
 			Name="Source Files"
 			Filters="*.c;*.C;*.cc;*.cpp;*.cp;*.cxx;*.c++;*.prg;*.pas;*.dpr;*.asm;*.s;*.bas;*.java;*.cs;*.sc;*.e;*.cob;*.html;*.rc;*.tcl;*.py;*.pl;*.d;*.m;*.mm;*.go">
+			<F N="sketch/DFR_Key.cpp"/>
 			<F N="main/LiquidCrystal.cpp"/>
 			<F N="sketch/LiquidCrystal.cpp"/>
+			<F N="sketch/screen_actions.cpp"/>
+			<F N="sketch/screen_draw.c"/>
+			<F N="sketch/screen_draw.cpp"/>
 		</Folder>
 		<Folder
 			Name="Header Files"
 			Filters="*.h;*.H;*.hh;*.hpp;*.hxx;*.inc;*.sh;*.cpy;*.if">
 			<F N="sketch/Boekel_WeightAnalyzer_ScreenDraw.hpp"/>
+			<F N="sketch/DFR_Key.h"/>
 			<F N="main/LiquidCrystal.h"/>
 			<F N="sketch/LiquidCrystal.h"/>
+			<F N="sketch/screen_actions.h"/>
+			<F N="sketch/screen_draw.h"/>
 		</Folder>
 		<Folder
 			Name="Resource Files"
