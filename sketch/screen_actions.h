@@ -34,6 +34,7 @@ void setPlace(const uint8_t p);
 uint8_t getPlace();
 void resetPlace();
 void updateCRMainScreen(float reading);
+void updateCRMainScreen(const char * s);
 void updateFirstCalibrationRemaningTime(char * timeRemaining);
 
 #endif

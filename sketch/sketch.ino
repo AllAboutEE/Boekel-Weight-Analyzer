@@ -15,9 +15,15 @@ const int EEPROM_ADDRESS_FACTOR_ONE = 0;
 const int EEPROM_ADDRESS_FACTOR_TWO = EEPROM_ADDRESS_FACTOR_ONE + sizeof(float);
 const int EEPROM_ADDRESS_CALIBRATION_ONE_VOLTAGE = EEPROM_ADDRESS_FACTOR_TWO + sizeof(float);
 const int EEPROM_ADDRESS_CALIBRATION_TWO_VOLTAGE = EEPROM_ADDRESS_CALIBRATION_ONE_VOLTAGE + sizeof(float);
+const int EEPROM_ADDRESS_KVALUE = EEPROM_ADDRESS_CALIBRATION_TWO_VOLTAGE + sizeof(float);
+const int EEPROM_ADDRESS_BVALUE = EEPROM_ADDRESS_KVALUE + sizeof(float);
 
 float factorOne = 1.000f;
 float factorTwo = 1.000f;
+float calibrationOneVoltage = 0.000f;
+float calibrationTwoVoltage = 0.000f;
+float kvalue = 0.000f;
+float bvalue = 0.000f;
 
 float rawToVoltage(float raw);
 
@@ -26,6 +32,15 @@ DFR_Key keypad;
 HX711  scale(A2,A1);
 
 int localKey = NO_KEY;
+
+// variables used to calculate current reading (cr)
+float crVoltageSum[100] = {0};
+unsigned long crAverageCount = 0;
+unsigned long crTimeStart = 0;
+
+// variables used to get calibration voltages
+float calibrationVoltageSum[100] = {0};
+unsigned long calibrationAverageCount = 0;
                  
 void setup() 
 { 
@@ -37,10 +52,6 @@ void setup()
 
   scale.set_scale();
   scale.tare();
-
-  EEPROM.get(EEPROM_ADDRESS_FACTOR_ONE, factorOne);
-  EEPROM.get(EEPROM_ADDRESS_FACTOR_TWO,factorTwo);
-
   
 }
 
@@ -62,22 +73,67 @@ void loop()
    {
        drawMainScreen();
        setScreenActionFlag(FLAG_SCREEN_ACTION_UPDATE_CR_MAIN_SCREEN);
+       crTimeStart = millis();
+       crAverageCount = 0;
+       updateCRMainScreen("--.--");
        delay(1000); // "debounce" button for when user is coming from another screen via a button press.
+
+        EEPROM.get(EEPROM_ADDRESS_FACTOR_ONE,factorOne);
+        EEPROM.get(EEPROM_ADDRESS_FACTOR_TWO,factorTwo); 
+        
+        EEPROM.get(EEPROM_ADDRESS_CALIBRATION_ONE_VOLTAGE,calibrationOneVoltage);
+        EEPROM.get(EEPROM_ADDRESS_CALIBRATION_TWO_VOLTAGE,calibrationTwoVoltage); 
+        
+        EEPROM.get(EEPROM_ADDRESS_KVALUE,kvalue);
+        EEPROM.get(EEPROM_ADDRESS_BVALUE,bvalue);
+
+        
+        Serial.print("Factor One: ");  
+        Serial.println(factorOne,3);
+        
+        Serial.print("Factor Two: ");
+        Serial.println(factorTwo,3);
+        
+        Serial.print("Calibration One Voltage (mV): ");
+        Serial.println(calibrationOneVoltage,8);
+        
+        Serial.print("Calibration Two Voltage (mV): ");
+        Serial.println(calibrationTwoVoltage,8);
+        
+        Serial.print("K Value: ");
+        Serial.println(kvalue,4);
+        
+        Serial.print("B Value: ");
+        Serial.println(bvalue,4);
+
+        Serial.println();
    }
    else
    {
         // User is in the main screen. The CR value is been updated.
-
-        // TODO obtain reading
-        Serial.println("Voltage: ");
-        Serial.println(rawToVoltage(scale.read()));
-        delay(1000);
-        Serial.println("RAW: ");
-        Serial.println(scale.read());
-        delay(1000);
+        if( ((crTimeStart + crAverageCount*1000)<=millis()) && crAverageCount<=100) // a second has passed
+        {
+          crVoltageSum[crAverageCount] = rawToVoltage(scale.read());
+          crAverageCount++;
+        }
         
-        updateCRMainScreen(20.50); // TODO pass reading instead of literal
+        
+        // TODO obtain reading
+        if(crAverageCount==100)
+        {
+          crTimeStart = millis();
+          crAverageCount = 0;
 
+          float cW = currentWeight(kvalue,getAverage(crVoltageSum,100),bvalue);
+          float cR = currentReading(factorTwo,cW);
+          updateCRMainScreen(cR); // update current reading on screen.
+          Serial.print("Current Weight: ");
+          Serial.println(cW,4);
+          Serial.print("Current Reading: ");
+          Serial.println(cR,4);
+          Serial.println();
+        } 
+        
         localKey = keypad.getKey();
         if(localKey!=SAMPLE_WAIT)
         {
@@ -89,6 +145,7 @@ void loop()
                 setScreenDrawFlag(FLAG_DRAW_CONFIRM_CALIBRATION_SCREEN);
             }
         }
+        
    }
   }
   else if(checkScreenDrawFlag(FLAG_DRAW_CONFIRM_CALIBRATION_SCREEN))
@@ -199,20 +256,30 @@ void loop()
       delay(500); // "debounce" button for when user is coming from another screen via a button press.
       timeStartCalibration = millis();
       timeCalibrationEnd = timeStartCalibration + 2UL*60UL*1000UL; // calibration takes 2 minutes
+      calibrationAverageCount = 0;
     }
     else
     {
       // calibration starts
       while(millis() < timeCalibrationEnd) 
-      {
-        // TODO read value from sensor and add to average array every 600ms
-        
+      {       
         // update time on screen
         unsigned long timeRemainingMs = timeCalibrationEnd - millis();
         unsigned long timeRemainingMinutes = timeRemainingMs / 1000UL / 60UL;
         unsigned long timeRemainingSeconds = (timeRemainingMs/1000UL) - (timeRemainingMinutes * 60UL);
         
         char timeRemainingString[5] = {'\0'};
+
+        // User is in the main screen. The CR value is been updated.
+
+        if(timeRemainingMs <= (105*1000)) // read the last 100 readings, compensate with 5 for delays
+        {
+          if( ((timeStartCalibration + calibrationAverageCount*600)<=millis()) && calibrationAverageCount<=100) // a second has passed
+          {
+            calibrationVoltageSum[calibrationAverageCount] = rawToVoltage(scale.read());
+            calibrationAverageCount++;
+          }
+        }
         
         sprintf(timeRemainingString, "%lu:%.2lu", timeRemainingMinutes,timeRemainingSeconds);
         updateFirstCalibrationRemaningTime(timeRemainingString);
@@ -222,11 +289,17 @@ void loop()
       clearScreenActionFlags();
       if(checkScreenDrawFlag(FLAG_DRAW_1ST_CALIBRATION_IN_PROGRESS_SCREEN))
       {
+        calibrationOneVoltage = getAverage(calibrationVoltageSum,100);
+        EEPROM.put(EEPROM_ADDRESS_CALIBRATION_ONE_VOLTAGE,calibrationOneVoltage);
         setScreenDrawFlag(FLAG_DRAW_PROMPT_FOR_FACTOR_ONE_SCREEN);
+        calibrationAverageCount = 0;
       }
       else if(checkScreenDrawFlag(FLAG_DRAW_2ND_CALIBRATION_IN_PROGRESS_SCREEN))
       {
+        calibrationTwoVoltage = getAverage(calibrationVoltageSum,100);
+        EEPROM.put(EEPROM_ADDRESS_CALIBRATION_TWO_VOLTAGE,calibrationTwoVoltage);
         setScreenDrawFlag(FLAG_DRAW_PROMPT_FOR_FACTOR_TWO_SCREEN);
+        calibrationAverageCount = 0;
       }
     }
   }
@@ -239,10 +312,13 @@ void loop()
     {
         if(checkScreenDrawFlag(FLAG_DRAW_PROMPT_FOR_FACTOR_ONE_SCREEN))
         {
+            factorOne = 1.00f;
+            
             factor = &factorOne;
         }
         else if(checkScreenDrawFlag(FLAG_DRAW_PROMPT_FOR_FACTOR_TWO_SCREEN))
         {
+            factorTwo = 1.00f;
             factor = &factorTwo;
         }
 
@@ -300,7 +376,20 @@ void loop()
             }
             else if(checkScreenDrawFlag(FLAG_DRAW_PROMPT_FOR_FACTOR_TWO_SCREEN))
             {
-              EEPROM.put(EEPROM_ADDRESS_FACTOR_ONE,factorTwo);
+              EEPROM.put(EEPROM_ADDRESS_FACTOR_TWO,factorTwo);
+
+              EEPROM.get(EEPROM_ADDRESS_FACTOR_ONE,factorOne);
+              EEPROM.get(EEPROM_ADDRESS_FACTOR_TWO,factorTwo); 
+              
+              EEPROM.get(EEPROM_ADDRESS_CALIBRATION_ONE_VOLTAGE,calibrationOneVoltage);
+              EEPROM.get(EEPROM_ADDRESS_CALIBRATION_TWO_VOLTAGE,calibrationTwoVoltage); 
+
+              kvalue = (factorTwo - factorOne) / ( (1.00f/calibrationTwoVoltage) - (1.00f/calibrationOneVoltage));
+              EEPROM.put(EEPROM_ADDRESS_KVALUE, kvalue);
+              
+              bvalue = factorOne - (kvalue/calibrationOneVoltage);
+              EEPROM.put(EEPROM_ADDRESS_BVALUE, bvalue);
+              
               setScreenDrawFlag(FLAG_DRAW_MAIN_SCREEN);            
             }
           break;
@@ -340,6 +429,28 @@ float rawToVoltage(float raw)
     return m * (raw - (float)0x800000) - 20.0f; // y = m (x - x1) + y1
   }
   
+}
+
+float currentWeight(float Kvalue, float VoltageAverage, float Bvalue)
+{
+  return ((Kvalue)/(VoltageAverage))+Bvalue;
+}
+
+float currentReading(float factorTwo, float currentWeight)
+{
+  return ((factorTwo - currentWeight)/8.0f)*1000.0f;
+}
+
+float getAverage(float * values, int length)
+{
+  float sum = 0;
+  
+  for(int i = 0; i<length; i++)
+  {
+    sum += *(values+i);
+  }
+  
+  return sum/(float)length;
 }
 
 

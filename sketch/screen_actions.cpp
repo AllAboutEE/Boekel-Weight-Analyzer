@@ -41,7 +41,9 @@ void clearScreenActionFlags()
 
 void setFactor(float value, float *factor)
 {
-  Serial.println(value);
+
+  *factor = roundf( (*factor) * 1000)/1000;
+  
   if( (value>=0.980) && (value<=1.500f) )
   {
     *factor = value;
@@ -57,7 +59,7 @@ void setFactor(float value, float *factor)
   }
 }
 
-void incrementFactor(float * factor)
+void incrementFactor(float * f)
 {
   float change = 0.000;
   uint8_t place = getPlace();
@@ -79,12 +81,12 @@ void incrementFactor(float * factor)
     break;
   }
   
-  setFactor(*factor+change,factor);
+  setFactor(*f+change,f);
   char factorString[6] = {'\0'};
   
   // Can't sprintf a float so let's seperate it
-  int d1 = *factor; // get the number to the left of the decimal
-  int d2 = trunc(((*factor)-d1)*1000); // get the number to the right of the decimal
+  int d1 = *f; // get the number to the left of the decimal
+  int d2 = trunc(((*f)-d1)*1000); // get the number to the right of the decimal
   sprintf(factorString,"%d.%.3d",d1,d2);
   lcd.setCursor(8,1);
   lcd.print(factorString);
@@ -180,6 +182,12 @@ void updateCRMainScreen(float reading)
 {
  lcd.setCursor(4,1);
  lcd.print(reading);
+}
+
+void updateCRMainScreen(const char * s)
+{
+ lcd.setCursor(4,1);
+ lcd.print(s);
 }
 
 void updateFirstCalibrationRemaningTime(char * timeRemaining)
