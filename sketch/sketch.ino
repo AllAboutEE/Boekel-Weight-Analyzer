@@ -1,7 +1,9 @@
 #include <LiquidCrystal.h>
+#include <EEPROM.h>
 #include "DFR_Key.h"
 #include "screen_draw.h"
 #include "screen_actions.h"
+#include "HX711.h"
 #include <stdbool.h>
 
 unsigned long timeStartCalibration = 0;
@@ -9,11 +11,19 @@ unsigned long timeCalibrationEnd = 0;
 
 float * factor;
 
+const int EEPROM_ADDRESS_FACTOR_ONE = 0;
+const int EEPROM_ADDRESS_FACTOR_TWO = EEPROM_ADDRESS_FACTOR_ONE + sizeof(float);
+const int EEPROM_ADDRESS_CALIBRATION_ONE_VOLTAGE = EEPROM_ADDRESS_FACTOR_TWO + sizeof(float);
+const int EEPROM_ADDRESS_CALIBRATION_TWO_VOLTAGE = EEPROM_ADDRESS_CALIBRATION_ONE_VOLTAGE + sizeof(float);
+
 float factorOne = 1.000f;
 float factorTwo = 1.000f;
 
+float rawToVoltage(float raw);
+
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 DFR_Key keypad;
+HX711  scale(A2,A1);
 
 int localKey = NO_KEY;
                  
@@ -24,6 +34,14 @@ void setup()
   lcd.begin(16, 2);
   lcd.clear();
   keypad.setRate(10);
+
+  scale.set_scale();
+  scale.tare();
+
+  EEPROM.get(EEPROM_ADDRESS_FACTOR_ONE, factorOne);
+  EEPROM.get(EEPROM_ADDRESS_FACTOR_TWO,factorTwo);
+
+  
 }
 
 void loop()
@@ -51,8 +69,13 @@ void loop()
         // User is in the main screen. The CR value is been updated.
 
         // TODO obtain reading
-        // float reading = getReading();
-
+        Serial.println("Voltage: ");
+        Serial.println(rawToVoltage(scale.read()));
+        delay(1000);
+        Serial.println("RAW: ");
+        Serial.println(scale.read());
+        delay(1000);
+        
         updateCRMainScreen(20.50); // TODO pass reading instead of literal
 
         localKey = keypad.getKey();
@@ -223,7 +246,14 @@ void loop()
             factor = &factorTwo;
         }
 
-        drawEnterFactorOneScreen();
+        char factorString[6] = {'\0'};
+  
+        // Can't sprintf a float so let's seperate it
+        int d1 = *factor; // get the number to the left of the decimal
+        int d2 = trunc(((*factor)-d1)*1000); // get the number to the right of the decimal
+        sprintf(factorString,"%d.%.3d",d1,d2);
+        
+        drawEnterFactorOneScreen(factorString);
         setScreenActionFlag(FLAG_SCREEN_ACTION_ENTER_FACTOR);
     }
     else
@@ -265,10 +295,12 @@ void loop()
 
             if(checkScreenDrawFlag(FLAG_DRAW_PROMPT_FOR_FACTOR_ONE_SCREEN))
             {
+              EEPROM.put(EEPROM_ADDRESS_FACTOR_ONE,factorOne);
               setScreenDrawFlag(FLAG_DRAW_2ND_CALIBRATION_PROMPT_SCREEN);
             }
             else if(checkScreenDrawFlag(FLAG_DRAW_PROMPT_FOR_FACTOR_TWO_SCREEN))
             {
+              EEPROM.put(EEPROM_ADDRESS_FACTOR_ONE,factorTwo);
               setScreenDrawFlag(FLAG_DRAW_MAIN_SCREEN);            
             }
           break;
@@ -280,3 +312,34 @@ void loop()
     }
   }
 }
+
+/**
+ * @description Used to convert a 24-bit 2's compliment number (800000h (MIN), 7FFFFFh (MAX) to a voltage (mV) value , where 0x800000 == -20mV and 0x7FFFFF = 20mV
+ * +/- 20mV is used because the default gain of the HX711 is 128 which as per the datasheet is used for +/- 20mV.
+ * @ param raw The raw 2's compliment value
+ */
+float rawToVoltage(float raw)
+{
+ 
+  float m = 0; // slope (m). We will use the equation y - y1 = m(x - x1) to obtain the voltage value.
+  
+  if(raw <= 0x7fffff) // [0 to 20mV]
+  {
+    // The two points (x1, y1), (x2, y2) for 0mV to 20mV are (0x00000, 0mV), and (0x7fffff, 20mV)
+    
+    m = (0 - 20.0f) / (0 - (float)0x7fffff); 
+   
+    return m * (raw - 0) + 0; // y = m (x - x1) + y1
+  }
+  else // (0 to -20mv]
+  {    
+    // The two points (x1, y1), (x2, y2) for 0mV to -20mV are (0x800000, -20mV), and (0xffffff, 0mV) 
+    
+    m = (-20.0 - 0) / ((float)0x800000 - (float)0xffffff); // slope (m)
+    
+    return m * (raw - (float)0x800000) - 20.0f; // y = m (x - x1) + y1
+  }
+  
+}
+
+

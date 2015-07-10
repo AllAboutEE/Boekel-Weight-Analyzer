@@ -26,6 +26,6 @@ void drawMainScreen();
 void drawConfirmCalibrationScreen(uint8_t selection);
 void drawCalibrationPromptScreen(const char * string);
 void drawCalibrationInProgessScreen();
-void drawEnterFactorOneScreen();
+void drawEnterFactorOneScreen(char * factor);
 
 #endif

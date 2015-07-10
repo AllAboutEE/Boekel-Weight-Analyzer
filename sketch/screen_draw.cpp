@@ -82,13 +82,14 @@ void drawCalibrationInProgessScreen()
   lcd.print("Don't touch");
 }
 
-void drawEnterFactorOneScreen()
+void drawEnterFactorOneScreen(char * factor)
 {
   lcd.clear();
   lcd.setCursor(0,0);
   lcd.print("Use U/D/L/R");
   lcd.setCursor(0,1);
-  lcd.print("Factor: 1.000");
+  lcd.print("Factor: ");
+  lcd.print(factor);
   lcd.setCursor(8,1);
   lcd.cursor();
   lcd.blink();
