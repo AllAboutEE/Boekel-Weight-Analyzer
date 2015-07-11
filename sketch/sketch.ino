@@ -1,3 +1,12 @@
+/**
+ * Weight Analyzer V 1.0.0 
+ * 
+ * All files in quotes must be in the same folder, at the same 
+ * level as this file (the sketch file). 
+ *  
+ * All files in brackets are part of the default arduino 
+ * libraries. 
+ */
 #include <LiquidCrystal.h>
 #include <EEPROM.h>
 #include "DFR_Key.h"
@@ -9,8 +18,9 @@
 unsigned long timeStartCalibration = 0;
 unsigned long timeCalibrationEnd = 0;
 
-float * factor;
+float * factor; // pointer passed to the factor related functions. It will hold either factor one or factor two.
 
+// The EEPROM addresses where user set and calculated values are stored.
 const int EEPROM_ADDRESS_FACTOR_ONE = 0;
 const int EEPROM_ADDRESS_FACTOR_TWO = EEPROM_ADDRESS_FACTOR_ONE + sizeof(float);
 const int EEPROM_ADDRESS_CALIBRATION_ONE_VOLTAGE = EEPROM_ADDRESS_FACTOR_TWO + sizeof(float);
@@ -18,6 +28,7 @@ const int EEPROM_ADDRESS_CALIBRATION_TWO_VOLTAGE = EEPROM_ADDRESS_CALIBRATION_ON
 const int EEPROM_ADDRESS_KVALUE = EEPROM_ADDRESS_CALIBRATION_TWO_VOLTAGE + sizeof(float);
 const int EEPROM_ADDRESS_BVALUE = EEPROM_ADDRESS_KVALUE + sizeof(float);
 
+// variables used for calculation.
 float factorOne = 1.000f;
 float factorTwo = 1.000f;
 float calibrationOneVoltage = 0.000f;
@@ -55,6 +66,15 @@ void setup()
   
 }
 
+/**
+ * The basic flow of the loop/main function is this: upon the 
+ * user pressing a button screen and action flags are set which 
+ * determine what to display in the LCD (i.e. which screens) and
+ * what to do in the background (i.e. save values to EEPROM, 
+ * select a different option). 
+ * 
+ * @author Miguel (7/10/2015)
+ */
 void loop()
 {  
   if(checkScreenDrawFlag(FLAG_DRAW_BOOT_SCREEN))
@@ -78,6 +98,7 @@ void loop()
        updateCRMainScreen("--.--");
        delay(1000); // "debounce" button for when user is coming from another screen via a button press.
 
+        // obtain the values for calculations from the EEPROM
         EEPROM.get(EEPROM_ADDRESS_FACTOR_ONE,factorOne);
         EEPROM.get(EEPROM_ADDRESS_FACTOR_TWO,factorTwo); 
         
@@ -107,6 +128,8 @@ void loop()
         Serial.println(bvalue,4);
 
         Serial.println();
+
+        Serial.println("Calculating current reading, please wait...");
    }
    else
    {
@@ -124,14 +147,19 @@ void loop()
           crTimeStart = millis();
           crAverageCount = 0;
 
-          float cW = currentWeight(kvalue,getAverage(crVoltageSum,100),bvalue);
+          float vAvg = getAverage(crVoltageSum,100);
+          float cW = currentWeight(kvalue,vAvg,bvalue);
           float cR = currentReading(factorTwo,cW);
           updateCRMainScreen(cR); // update current reading on screen.
+
+          Serial.print("Voltage Average: ");
+          Serial.println(vAvg);
           Serial.print("Current Weight: ");
           Serial.println(cW,4);
           Serial.print("Current Reading: ");
           Serial.println(cR,4);
           Serial.println();
+          Serial.println("Calculating current reading, please wait...");
         } 
         
         localKey = keypad.getKey();
@@ -289,6 +317,7 @@ void loop()
       clearScreenActionFlags();
       if(checkScreenDrawFlag(FLAG_DRAW_1ST_CALIBRATION_IN_PROGRESS_SCREEN))
       {
+        // save the new Calibration One Voltage
         calibrationOneVoltage = getAverage(calibrationVoltageSum,100);
         EEPROM.put(EEPROM_ADDRESS_CALIBRATION_ONE_VOLTAGE,calibrationOneVoltage);
         setScreenDrawFlag(FLAG_DRAW_PROMPT_FOR_FACTOR_ONE_SCREEN);
@@ -296,6 +325,7 @@ void loop()
       }
       else if(checkScreenDrawFlag(FLAG_DRAW_2ND_CALIBRATION_IN_PROGRESS_SCREEN))
       {
+          // save the new Calibration Two Voltage.
         calibrationTwoVoltage = getAverage(calibrationVoltageSum,100);
         EEPROM.put(EEPROM_ADDRESS_CALIBRATION_TWO_VOLTAGE,calibrationTwoVoltage);
         setScreenDrawFlag(FLAG_DRAW_PROMPT_FOR_FACTOR_TWO_SCREEN);
@@ -376,21 +406,22 @@ void loop()
             }
             else if(checkScreenDrawFlag(FLAG_DRAW_PROMPT_FOR_FACTOR_TWO_SCREEN))
             {
-              EEPROM.put(EEPROM_ADDRESS_FACTOR_TWO,factorTwo);
+              EEPROM.put(EEPROM_ADDRESS_FACTOR_TWO,factorTwo); // store the new factor two value.
 
+              // update the calculation vairables with the new set values.
               EEPROM.get(EEPROM_ADDRESS_FACTOR_ONE,factorOne);
               EEPROM.get(EEPROM_ADDRESS_FACTOR_TWO,factorTwo); 
               
               EEPROM.get(EEPROM_ADDRESS_CALIBRATION_ONE_VOLTAGE,calibrationOneVoltage);
               EEPROM.get(EEPROM_ADDRESS_CALIBRATION_TWO_VOLTAGE,calibrationTwoVoltage); 
 
-              kvalue = (factorTwo - factorOne) / ( (1.00f/calibrationTwoVoltage) - (1.00f/calibrationOneVoltage));
-              EEPROM.put(EEPROM_ADDRESS_KVALUE, kvalue);
+              kvalue = (factorTwo - factorOne) / ( (1.00f/calibrationTwoVoltage) - (1.00f/calibrationOneVoltage)); // as per the specifications document.
+              EEPROM.put(EEPROM_ADDRESS_KVALUE, kvalue); // update the new
               
-              bvalue = factorOne - (kvalue/calibrationOneVoltage);
+              bvalue = factorOne - (kvalue/calibrationOneVoltage); // as per the specifications document.
               EEPROM.put(EEPROM_ADDRESS_BVALUE, bvalue);
               
-              setScreenDrawFlag(FLAG_DRAW_MAIN_SCREEN);            
+              setScreenDrawFlag(FLAG_DRAW_MAIN_SCREEN); // Calibration complete. The user will go back to the main screen as per the specifications document.           
             }
           break;
         default:
@@ -431,16 +462,48 @@ float rawToVoltage(float raw)
   
 }
 
+/**
+ * Calculates the "Current Weight"
+ * 
+ * @author Miguel (7/10/2015)
+ * 
+ * @param Kvalue 
+ * @param VoltageAverage 
+ * @param Bvalue 
+ * 
+ * @return float 
+ */
 float currentWeight(float Kvalue, float VoltageAverage, float Bvalue)
 {
   return ((Kvalue)/(VoltageAverage))+Bvalue;
 }
 
+/**
+ * Calculates the "Current Reading" or "CR"
+ * 
+ * @author Miguel (7/10/2015)
+ * 
+ * @param factorTwo 
+ * @param currentWeight 
+ * 
+ * @return float 
+ */
 float currentReading(float factorTwo, float currentWeight)
 {
   return ((factorTwo - currentWeight)/8.0f)*1000.0f;
 }
 
+/**
+ * Gets the average value from an array of values.
+ * 
+ * @author Miguel (7/10/2015)
+ * 
+ * @param values The pointer/array to the values.
+ * @param length The length of the array of values
+ * 
+ * @return float The average value of the array elements when 
+ *         added together and divided by length.
+ */
 float getAverage(float * values, int length)
 {
   float sum = 0;

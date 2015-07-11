@@ -18,8 +18,7 @@ const uint8_t FLAG_DRAW_PROMPT_FOR_FACTOR_TWO_SCREEN = 0x20;
 
 bool checkScreenDrawFlag(const uint8_t FLAG);
 uint8_t getScreenDrawFlags();
-uint8_t setScreenDrawFlag(const uint8_t FLAG);
-uint8_t clearScreenDrawFlag(const uint8_t FLAG);
+void setScreenDrawFlag(const uint8_t FLAG);
 void clearScreenDrawFlags();
 void drawBootScreen();
 void drawMainScreen();

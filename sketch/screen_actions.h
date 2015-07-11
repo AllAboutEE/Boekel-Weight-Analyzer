@@ -21,8 +21,8 @@ const uint8_t PLACE_THOUSANDTHS = 3;
 
 bool checkScreenActionFlag(const uint8_t FLAG);
 uint8_t getScreenActionFlags();
-uint8_t setScreenActionFlag(const uint8_t FLAG);
-uint8_t clearScreenActionFlag(const uint8_t FLAG);
+void setScreenActionFlag(const uint8_t FLAG);
+void clearScreenActionFlag(const uint8_t FLAG);
 void clearScreenActionFlags();
 void setFactor(float value, float *factor);
 void incrementFactor(float * factor);

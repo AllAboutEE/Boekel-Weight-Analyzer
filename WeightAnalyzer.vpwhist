@@ -5,17 +5,25 @@ WeightAnalyzer.vpj=20150710064526633
 [ActiveConfig]
 WeightAnalyzer.vpj=Debug
 [State]
-SCREEN: 1366 768 683 0 667 690 0 0 N 0 0 0 0 482 613 0
+SCREEN: 1366 768 349 39 668 691 0 0 M 0 0 0 0 1181 629 0
 CWD: sketch
+BUFFER: BN="sketch\sketch.ino"
+BI: MA=1 74 1  TABS=1 5  WWS=1 IWT=0 ST=0 IN=2 BW=0 US=32000 RO=0 SE=1 SN=0 BIN=0 MN=C/C++	HM=0 MF=118489120 TL=0 MLL=0 ASE=0 LNL=1 LCF=0 CAPS=0 E=70 ESBU2=71 CL="" SC="" SCE= SCU=
+VIEW: LN=.220 CL=1 LE=0 CX=1 CY=0 WI=5 BI=9 HT=0 HN=0 HF=0 HC=4
+WINDOW: 1 22 1179 606 0 0 N  WF=0 WT=2 "Default Unicode Font,10,0,1" DID=0
+BUFFER: BN="sketch\sketch.ino"
+VIEW: LN=.201 CL=14 LE=0 CX=14 CY=6 WI=71 BI=9 HT=0 HN=0 HF=0 HC=4
+MDISTATE: 1
+AAAAAAAAAAHaAAAAAAAAADcAAAVVAAACq+oAAAAC+gAAAAEAAAABAAAAAPoAAAABAAAAAQAAAAD8AAAAegAyADoAOgA6AEMAOgBcAFUAcwBlAHIAcwBcAE0AaQBnAHUAZQBsAFwARABlAHMAawB0AG8AcABcAFcAZQBpAGcAaAB0ACAAQQBuAGEAbAB5AHoAZQByAFwAcwBrAGUAdABjAGgAXABzAGsAZQB0AGMAaAAuAGkAbgBvAQD/////AAE=
 FILEHIST: 9
 \Program Files (x86)\Arduino\libraries\screen_draw\screen_draw.c
 \Program Files (x86)\Arduino\libraries\screen_draw\screen_draw.cpp
 \Program Files (x86)\Arduino\libraries\screen_draw\screen_draw.h
-sketch\screen_actions.cpp
+sketch\HX711\HX711.h
+sketch\screen_draw.h
 sketch\screen_draw.cpp
 sketch\screen_actions.h
-sketch\screen_draw.h
-sketch\HX711\HX711.h
+sketch\screen_actions.cpp
 sketch\sketch.ino
 TBCLASS: 0 0
 DEBUG: 0 0 0 0 3 0 gdb
